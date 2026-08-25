@@ -63,4 +63,7 @@ export async function renderQrCode(canvas: HTMLCanvasElement, s: CodeSettings) {
     scale: Math.max(1, Math.round(s.moduleWidth * PX_PER_MM)),
     color: { dark: s.barColor, light: s.bgColor },
   });
+  // qrcode force des dimensions inline : on les rend au format millimétrique.
+  canvas.style.width = `${s.totalWidth}mm`;
+  canvas.style.height = "auto";
 }
