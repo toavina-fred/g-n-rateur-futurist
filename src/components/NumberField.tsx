@@ -51,7 +51,7 @@ export function NumberField({
         min={min}
         max={max}
         step={step}
-        onValueChange={([v]) => onChange(Number.parseFloat(v.toFixed(decimals)))}
+        onValueChange={(vals) => onChange(Number.parseFloat((vals[0] ?? min).toFixed(decimals)))}
         aria-label={label}
       />
     </div>

@@ -56,7 +56,7 @@ const FONTS = [
 const DEFAULTS = {
   code128: { moduleWidth: 0.347, totalWidth: 35 },
   qrcode: { moduleWidth: 0.952, totalWidth: 20 },
-} as const;
+};
 
 function Index() {
   const [type, setType] = useState<CodeType>("code128");
