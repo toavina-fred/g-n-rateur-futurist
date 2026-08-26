@@ -146,9 +146,18 @@ function Index() {
   return (
     <main className="mx-auto w-full max-w-6xl px-5 pb-20 pt-10 sm:px-8">
       <header className="mb-10 flex flex-col gap-4">
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-primary">
-          <ScanLine className="h-3.5 w-3.5" /> Génération côté client
-        </span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-primary">
+            <ScanLine className="h-3.5 w-3.5" /> Génération côté client
+          </span>
+          <Link
+            to="/import"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-foreground transition-all duration-300 hover:border-primary/40 hover:text-primary hover:glow-neon"
+          >
+            <FileSpreadsheet className="h-4 w-4" /> Génération par import
+          </Link>
+        </div>
+
         <h1 className="max-w-2xl text-4xl font-bold leading-tight sm:text-5xl">
           Générateur de codes-barres{" "}
           <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
