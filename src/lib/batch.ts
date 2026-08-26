@@ -77,14 +77,15 @@ export async function parseExcel(file: File): Promise<ParsedRow[]> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheetName = workbook.SheetNames[0];
-  if (!sheetName) throw new Error("Le fichier Excel ne contient aucune feuille.");
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], {
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+  if (!sheet) throw new Error("Le fichier Excel ne contient aucune feuille.");
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: "",
     raw: false,
   });
   if (rows.length === 0) throw new Error("Le fichier importé est vide.");
 
-  const header = Object.keys(rows[0]);
+  const header = Object.keys(rows[0] ?? {});
   const column = header.find((key) => key.trim().toLowerCase() === "contenu");
   if (!column)
     throw new Error(

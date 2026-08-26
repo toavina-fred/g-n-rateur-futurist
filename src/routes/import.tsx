@@ -126,6 +126,7 @@ function ImportPage() {
     for (let i = 0; i < rows.length; i += 1) {
       if (stopRef.current) break;
       const row = rows[i];
+      if (!row) continue;
       setResults((prev) =>
         prev.map((r, index) => (index === i ? { ...r, status: "running" } : r)),
       );
