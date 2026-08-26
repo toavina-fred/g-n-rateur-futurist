@@ -25,21 +25,49 @@ export type CodeSettings = {
 export const URL_REGEX = /^https?:\/\/[^\s.]+\.[^\s]{2,}$/i;
 
 export function isContentValid(type: CodeType, content: string): boolean {
-  if (type === "code128") return content.length === 9;
+  if (type === "code128") return content.length >= 9;
   return URL_REGEX.test(content.trim());
 }
 
 export function contentError(type: CodeType, content: string): string | null {
   if (type === "code128") {
-    if (content.length === 0) return "Le contenu est requis (9 caractères exactement).";
+    if (content.length === 0) return "Le contenu est requis (9 caractères minimum).";
     if (content.length < 9)
-      return `Le contenu doit comporter exactement 9 caractères (${content.length}/9).`;
+      return `Le contenu doit comporter 9 caractères minimum (${content.length}/9).`;
     return null;
   }
   if (content.trim().length === 0) return "Le contenu est requis (une URL valide).";
   if (!URL_REGEX.test(content.trim()))
     return "Format invalide : l'URL doit commencer par http:// ou https://";
   return null;
+}
+
+/**
+ * jsPDF n'embarque que 3 polices natives utilisables ici (helvetica, times,
+ * courier) : on associe chaque police du sélecteur à son équivalent natif le
+ * plus proche, pour que l'aperçu (canvas) et l'export PDF affichent
+ * exactement la même police au lieu de diverger.
+ */
+function classifyFontFamily(fontFamily: string): "courier" | "times" | "helvetica" {
+  const normalized = fontFamily.toLowerCase();
+  if (normalized.includes("courier")) return "courier";
+  if (normalized.includes("times")) return "times";
+  return "helvetica";
+}
+
+function mapFontFamilyToPdfFont(fontFamily: string): { family: string; style: string } {
+  return { family: classifyFontFamily(fontFamily), style: "normal" };
+}
+
+function mapFontFamilyToCssStack(fontFamily: string): string {
+  switch (classifyFontFamily(fontFamily)) {
+    case "courier":
+      return "'Courier New', Courier, monospace";
+    case "times":
+      return "'Times New Roman', Times, serif";
+    default:
+      return "Helvetica, Arial, sans-serif";
+  }
 }
 
 export function renderCode128(canvas: HTMLCanvasElement, s: CodeSettings) {
@@ -50,7 +78,7 @@ export function renderCode128(canvas: HTMLCanvasElement, s: CodeSettings) {
     displayValue: s.showText,
     background: s.bgColor,
     lineColor: s.barColor,
-    font: s.fontFamily,
+    font: mapFontFamilyToCssStack(s.fontFamily),
     fontSize: Math.max(1, s.fontSize * PT_TO_MM * PX_PER_MM),
     textMargin: 1 * PX_PER_MM * 0.3,
     margin: Math.round(0.5 * PX_PER_MM),
@@ -118,7 +146,8 @@ export function drawCode128ToPdf(
   if (s.showText) {
     const textMargin = 1;
     const textHeight = s.fontSize * PT_TO_MM;
-    doc.setFont("helvetica", "normal");
+    const pdfFont = mapFontFamilyToPdfFont(s.fontFamily);
+    doc.setFont(pdfFont.family, pdfFont.style);
     doc.setFontSize(s.fontSize);
     doc.setTextColor(s.barColor);
     doc.text(s.content, x + barsWidth / 2, y + s.moduleHeight + textMargin + textHeight, {

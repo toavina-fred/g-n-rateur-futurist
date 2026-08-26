@@ -110,7 +110,7 @@ function Index() {
   };
 
   const handleContentChange = (value: string) => {
-    setContent(type === "code128" ? value.slice(0, 9) : value);
+    setContent(type === "code128" ? value.slice(0, 11) : value);
     setTouched(true);
   };
 
@@ -199,20 +199,22 @@ function Index() {
                 {isBarcode && (
                   <span
                     className={`shrink-0 font-mono text-xs ${
-                      content.length === 9 ? "text-primary" : "text-muted-foreground"
+                      content.length >= 9 ? "text-primary" : "text-muted-foreground"
                     }`}
                   >
-                    {content.length}/9
+                    9 min
                   </span>
                 )}
               </div>
               <Input
                 id="content"
                 value={content}
-                maxLength={isBarcode ? 9 : undefined}
+                minLength={9}
                 onChange={(e) => handleContentChange(e.target.value)}
                 onBlur={() => setTouched(true)}
-                placeholder={isBarcode ? "9 caractères, ex. ABC123456" : "https://exemple.com"}
+                placeholder={
+                  isBarcode ? "9 caractères minimum, ex. ABC123456" : "https://exemple.com"
+                }
                 aria-invalid={Boolean(error)}
                 className="border-white/10 bg-white/5 font-mono"
               />

@@ -33,13 +33,13 @@ export const QRCODE_PRESET: Omit<CodeSettings, "content"> = {
   fontSize: 7,
 };
 
-export const FORMAT_ERROR = "Format non reconnu : ni URL ni 9 caractères";
+export const FORMAT_ERROR = "Format non reconnu : ni URL ni 9 caractères minimum";
 
 /** Détecte le type de code à générer pour une valeur donnée. */
 export function detectType(raw: string): CodeType | null {
   const value = raw.trim();
   if (URL_REGEX.test(value)) return "qrcode";
-  if (value.length === 9) return "code128";
+  if (value.length >= 9) return "code128";
   return null;
 }
 
