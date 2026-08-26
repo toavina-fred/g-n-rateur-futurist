@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Barcode, Download, QrCode, ScanLine } from "lucide-react";
+import { Barcode, Download, FileSpreadsheet, QrCode, ScanLine } from "lucide-react";
+
 
 import { ColorField } from "@/components/ColorField";
 import { NumberField } from "@/components/NumberField";
