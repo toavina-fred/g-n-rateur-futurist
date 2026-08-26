@@ -7,6 +7,16 @@ export const PX_PER_MM = 12;
 
 export const PT_TO_MM = 0.352_777_8;
 
+/**
+ * Répartition (mm) mesurée sur un code-barres de référence produit par
+ * Barcody : marges latérales autour des barres, marge au-dessus des barres,
+ * espace entre les barres et le texte, et marge sous le texte.
+ */
+const CODE128_MARGIN_SIDE_MM = 3.5;
+const CODE128_MARGIN_TOP_MM = 1.69;
+const CODE128_TEXT_GAP_MM = 0.17;
+const CODE128_MARGIN_BOTTOM_MM = 0.51;
+
 export type CodeType = "code128" | "qrcode";
 
 export type CodeSettings = {
@@ -20,6 +30,7 @@ export type CodeSettings = {
   showText: boolean;
   fontFamily: string;
   fontSize: number; // pt
+  letterSpacing: number; // mm, espacement entre les caractères du texte affiché
 };
 
 export const URL_REGEX = /^https?:\/\/[^\s.]+\.[^\s]{2,}$/i;
@@ -70,26 +81,102 @@ function mapFontFamilyToCssStack(fontFamily: string): string {
   }
 }
 
-export function renderCode128(canvas: HTMLCanvasElement, s: CodeSettings) {
-  JsBarcode(canvas, s.content, {
+/**
+ * Le nombre de modules d'un Code 128 dépend de l'encodage du contenu : on
+ * mesure d'abord la largeur "naturelle" pour 1 module de large, puis on en
+ * déduit la largeur de module (mm) qui fera correspondre exactement le rendu
+ * à `totalWidth` (la largeur code-barres demandée par l'utilisateur).
+ */
+function computeCode128ModuleWidthMm(s: CodeSettings): number {
+  const probe = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  JsBarcode(probe, s.content, {
     format: "CODE128",
-    width: Math.max(0.6, s.moduleWidth * PX_PER_MM),
-    height: Math.max(1, s.moduleHeight * PX_PER_MM),
-    displayValue: s.showText,
-    background: s.bgColor,
-    lineColor: s.barColor,
-    font: mapFontFamilyToCssStack(s.fontFamily),
-    fontSize: Math.max(1, s.fontSize * PT_TO_MM * PX_PER_MM),
-    textMargin: 1 * PX_PER_MM * 0.3,
-    margin: Math.round(0.5 * PX_PER_MM),
+    width: 1,
+    height: 1,
+    displayValue: false,
+    margin: 0,
   });
+  const naturalWidth = parseFloat(probe.getAttribute("width") ?? "0");
+  if (!Number.isFinite(naturalWidth) || naturalWidth <= 0) return s.moduleWidth;
+  return s.totalWidth / naturalWidth;
+}
+
+/**
+ * Dessine `text` centré sur `centerX`, en insérant `spacingPx` entre chaque
+ * caractère. `ctx.letterSpacing` n'est pas fiable/disponible sur tous les
+ * moteurs (et n'a pas d'équivalent dans jsPDF) : on mesure et positionne donc
+ * chaque caractère manuellement, pour un rendu identique aperçu/PDF.
+ */
+function drawSpacedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  y: number,
+  spacingPx: number,
+) {
+  const chars = [...text];
+  const widths = chars.map((c) => ctx.measureText(c).width);
+  const totalWidth = widths.reduce((a, w) => a + w, 0) + spacingPx * Math.max(0, chars.length - 1);
+  const prevAlign = ctx.textAlign;
+  ctx.textAlign = "left";
+  let x = centerX - totalWidth / 2;
+  chars.forEach((c, i) => {
+    ctx.fillText(c, x, y);
+    x += (widths[i] ?? 0) + spacingPx;
+  });
+  ctx.textAlign = prevAlign;
+}
+
+export function renderCode128(canvas: HTMLCanvasElement, s: CodeSettings) {
+  const moduleWidthMm = computeCode128ModuleWidthMm(s);
+  const barsCanvas = document.createElement("canvas");
+  JsBarcode(barsCanvas, s.content, {
+    format: "CODE128",
+    width: Math.max(0.6, moduleWidthMm * PX_PER_MM),
+    height: Math.max(1, s.moduleHeight * PX_PER_MM),
+    displayValue: false,
+    lineColor: s.barColor,
+    margin: 0,
+  });
+
+  const sideMarginPx = CODE128_MARGIN_SIDE_MM * PX_PER_MM;
+  const topMarginPx = CODE128_MARGIN_TOP_MM * PX_PER_MM;
+  const gapPx = CODE128_TEXT_GAP_MM * PX_PER_MM;
+  const bottomMarginPx = CODE128_MARGIN_BOTTOM_MM * PX_PER_MM;
+  const fontSizePx = Math.max(1, s.fontSize * PT_TO_MM * PX_PER_MM);
+  const textSpacePx = s.showText ? gapPx + fontSizePx + bottomMarginPx : bottomMarginPx;
+
+  canvas.width = barsCanvas.width + 2 * sideMarginPx;
+  canvas.height = topMarginPx + barsCanvas.height + textSpacePx;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.fillStyle = s.bgColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(barsCanvas, sideMarginPx, topMarginPx);
+
+  if (!s.showText) return;
+
+  const spacingPx = s.letterSpacing * PX_PER_MM;
+  ctx.font = `${fontSizePx}px ${mapFontFamilyToCssStack(s.fontFamily)}`;
+  ctx.fillStyle = s.barColor;
+  ctx.textBaseline = "top";
+  drawSpacedText(
+    ctx,
+    s.content,
+    canvas.width / 2,
+    topMarginPx + barsCanvas.height + gapPx,
+    spacingPx,
+  );
 }
 
 export async function renderQrCode(canvas: HTMLCanvasElement, s: CodeSettings) {
+  const { cell } = computeQrLayout(s);
   await QRCode.toCanvas(canvas, s.content.trim(), {
     errorCorrectionLevel: "M",
     margin: 2,
-    scale: Math.max(1, Math.round(s.moduleWidth * PX_PER_MM)),
+    scale: Math.max(1, Math.round(cell * PX_PER_MM)),
     color: { dark: s.barColor, light: s.bgColor },
   });
   // qrcode force des dimensions inline : on les rend au format millimétrique.
@@ -97,11 +184,14 @@ export async function renderQrCode(canvas: HTMLCanvasElement, s: CodeSettings) {
   canvas.style.height = "auto";
 }
 
-function buildCode128Svg(s: CodeSettings): { svg: SVGSVGElement; width: number; height: number } {
+function buildCode128Svg(
+  s: CodeSettings,
+): { svg: SVGSVGElement; barsWidth: number; width: number; height: number } {
+  const moduleWidthMm = computeCode128ModuleWidthMm(s);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   JsBarcode(svg, s.content, {
     format: "CODE128",
-    width: s.moduleWidth,
+    width: moduleWidthMm,
     height: s.moduleHeight,
     displayValue: false,
     margin: 0,
@@ -109,10 +199,12 @@ function buildCode128Svg(s: CodeSettings): { svg: SVGSVGElement; width: number; 
   });
 
   const barsWidth = parseFloat(svg.getAttribute("width") ?? "0");
-  let totalHeight = s.moduleHeight;
-  if (s.showText) totalHeight += 1 + s.fontSize * PT_TO_MM;
+  let totalHeight = CODE128_MARGIN_TOP_MM + s.moduleHeight;
+  totalHeight += s.showText
+    ? CODE128_TEXT_GAP_MM + s.fontSize * PT_TO_MM + CODE128_MARGIN_BOTTOM_MM
+    : CODE128_MARGIN_BOTTOM_MM;
 
-  return { svg, width: barsWidth, height: totalHeight };
+  return { svg, barsWidth, width: barsWidth + 2 * CODE128_MARGIN_SIDE_MM, height: totalHeight };
 }
 
 /** Dimensions (mm) qu'occupera le Code 128 une fois rendu, sans dessiner. */
@@ -131,7 +223,9 @@ export function drawCode128ToPdf(
   y: number,
   s: CodeSettings,
 ): { width: number; height: number } {
-  const { svg, width: barsWidth } = buildCode128Svg(s);
+  const { svg, barsWidth, width: totalWidth } = buildCode128Svg(s);
+  const barsX = x + CODE128_MARGIN_SIDE_MM;
+  const barsY = y + CODE128_MARGIN_TOP_MM;
 
   doc.setFillColor(s.barColor);
   svg.querySelectorAll("g > rect").forEach((rect) => {
@@ -139,31 +233,41 @@ export function drawCode128ToPdf(
     const ry = parseFloat(rect.getAttribute("y") ?? "0");
     const rw = parseFloat(rect.getAttribute("width") ?? "0");
     const rh = parseFloat(rect.getAttribute("height") ?? "0");
-    doc.rect(x + rx, y + ry, rw, rh, "F");
+    doc.rect(barsX + rx, barsY + ry, rw, rh, "F");
   });
 
-  let totalHeight = s.moduleHeight;
+  let totalHeight = CODE128_MARGIN_TOP_MM + s.moduleHeight;
   if (s.showText) {
-    const textMargin = 1;
     const textHeight = s.fontSize * PT_TO_MM;
     const pdfFont = mapFontFamilyToPdfFont(s.fontFamily);
     doc.setFont(pdfFont.family, pdfFont.style);
     doc.setFontSize(s.fontSize);
     doc.setTextColor(s.barColor);
-    doc.text(s.content, x + barsWidth / 2, y + s.moduleHeight + textMargin + textHeight, {
-      align: "center",
+
+    const chars = [...s.content];
+    const widths = chars.map((c) => doc.getTextWidth(c));
+    const totalTextWidth =
+      widths.reduce((a, w) => a + w, 0) + s.letterSpacing * Math.max(0, chars.length - 1);
+    const textY = barsY + s.moduleHeight + CODE128_TEXT_GAP_MM + textHeight;
+    let charX = barsX + barsWidth / 2 - totalTextWidth / 2;
+    chars.forEach((c, i) => {
+      doc.text(c, charX, textY);
+      charX += (widths[i] ?? 0) + s.letterSpacing;
     });
-    totalHeight += textMargin + textHeight;
+
+    totalHeight += CODE128_TEXT_GAP_MM + textHeight + CODE128_MARGIN_BOTTOM_MM;
+  } else {
+    totalHeight += CODE128_MARGIN_BOTTOM_MM;
   }
 
-  return { width: barsWidth, height: totalHeight };
+  return { width: totalWidth, height: totalHeight };
 }
 
 function computeQrLayout(s: CodeSettings) {
   const qr = QRCode.create(s.content.trim(), { errorCorrectionLevel: "M" });
   const size = qr.modules.size;
   const quietZone = 2;
-  const cell = s.moduleWidth;
+  const cell = s.totalWidth / (size + quietZone * 2);
   return { qr, size, quietZone, cell, totalSize: (size + quietZone * 2) * cell };
 }
 

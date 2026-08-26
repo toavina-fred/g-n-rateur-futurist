@@ -28,6 +28,7 @@ import {
   type CodeType,
 } from "@/lib/codegen";
 import { safeFileName } from "@/lib/batch";
+import { loadSettings, saveSettings } from "@/lib/settingsStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,20 +57,35 @@ const DEFAULTS = {
   qrcode: { moduleWidth: 0.952, totalWidth: 20 },
 };
 
+const TOTAL_WIDTH_MAX = 100;
+
 function Index() {
+  const initialSettings = loadSettings("code128");
   const [type, setType] = useState<CodeType>("code128");
   const [content, setContent] = useState("");
-  const [moduleWidth, setModuleWidth] = useState(DEFAULTS.code128.moduleWidth);
-  const [totalWidth, setTotalWidth] = useState(DEFAULTS.code128.totalWidth);
-  const [moduleHeight, setModuleHeight] = useState(4);
-  const [barColor, setBarColor] = useState("#000000");
-  const [bgColor, setBgColor] = useState("#FFFFFF");
-  const [showText, setShowText] = useState(true);
-  const [fontFamily, setFontFamily] = useState("Helvetica Neue");
-  const [fontSize, setFontSize] = useState(7);
+  const [totalWidth, setTotalWidth] = useState(
+    initialSettings?.totalWidth ?? DEFAULTS.code128.totalWidth,
+  );
+  const [moduleHeight, setModuleHeight] = useState(initialSettings?.moduleHeight ?? 4);
+  const [barColor, setBarColor] = useState(initialSettings?.barColor ?? "#000000");
+  const [bgColor, setBgColor] = useState(initialSettings?.bgColor ?? "#FFFFFF");
+  const [showText, setShowText] = useState(initialSettings?.showText ?? true);
+  const [fontFamily, setFontFamily] = useState(initialSettings?.fontFamily ?? "Helvetica Neue");
+  const [fontSize, setFontSize] = useState(initialSettings?.fontSize ?? 7);
+  const [letterSpacing, setLetterSpacing] = useState(initialSettings?.letterSpacing ?? 1.37);
   const [touched, setTouched] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const moduleWidth = useMemo(() => {
+    const { moduleWidth: refModule, totalWidth: refTotal } = DEFAULTS[type];
+    return Number(((refModule / refTotal) * totalWidth).toFixed(3));
+  }, [type, totalWidth]);
+
+  const moduleWidthMax = useMemo(() => {
+    const { moduleWidth: refModule, totalWidth: refTotal } = DEFAULTS[type];
+    return (refModule / refTotal) * TOTAL_WIDTH_MAX;
+  }, [type]);
 
   const settings: CodeSettings = useMemo(
     () => ({
@@ -83,6 +99,7 @@ function Index() {
       showText,
       fontFamily,
       fontSize,
+      letterSpacing,
     }),
     [
       type,
@@ -95,6 +112,7 @@ function Index() {
       showText,
       fontFamily,
       fontSize,
+      letterSpacing,
     ],
   );
 
@@ -103,9 +121,16 @@ function Index() {
 
   const handleTypeChange = (next: string) => {
     const nextType = next as CodeType;
+    const stored = loadSettings(nextType);
     setType(nextType);
-    setModuleWidth(DEFAULTS[nextType].moduleWidth);
-    setTotalWidth(DEFAULTS[nextType].totalWidth);
+    setTotalWidth(stored?.totalWidth ?? DEFAULTS[nextType].totalWidth);
+    setModuleHeight(stored?.moduleHeight ?? 4);
+    setBarColor(stored?.barColor ?? "#000000");
+    setBgColor(stored?.bgColor ?? "#FFFFFF");
+    setShowText(stored?.showText ?? true);
+    setFontFamily(stored?.fontFamily ?? "Helvetica Neue");
+    setFontSize(stored?.fontSize ?? 7);
+    setLetterSpacing(stored?.letterSpacing ?? 1.37);
     setTouched(false);
   };
 
@@ -128,6 +153,10 @@ function Index() {
   useEffect(() => {
     void draw();
   }, [draw]);
+
+  useEffect(() => {
+    saveSettings(type, settings);
+  }, [type, settings]);
 
   const exportPdf = async () => {
     if (!valid) return;
@@ -226,10 +255,11 @@ function Index() {
               label="Largeur du module"
               unit="mm"
               value={moduleWidth}
-              onChange={setModuleWidth}
-              min={0.1}
-              max={3}
+              onChange={() => {}}
+              min={0}
+              max={moduleWidthMax}
               step={0.001}
+              disabled
             />
 
             <NumberField
@@ -239,7 +269,7 @@ function Index() {
               value={totalWidth}
               onChange={setTotalWidth}
               min={5}
-              max={180}
+              max={TOTAL_WIDTH_MAX}
               step={0.5}
             />
 

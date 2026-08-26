@@ -12,6 +12,7 @@ type Props = {
   max: number;
   step: number;
   decimals?: number;
+  disabled?: boolean;
 };
 
 export function NumberField({
@@ -24,6 +25,7 @@ export function NumberField({
   max,
   step,
   decimals = 3,
+  disabled = false,
 }: Props) {
   return (
     <div className="space-y-3">
@@ -41,7 +43,9 @@ export function NumberField({
             step={step}
             value={Number.isFinite(value) ? value : ""}
             onChange={(e) => onChange(Number.parseFloat(e.target.value))}
-            className="h-9 w-24 border-white/10 bg-white/5 text-right font-mono text-sm tabular-nums"
+            readOnly={disabled}
+            disabled={disabled}
+            className="h-9 w-24 border-white/10 bg-white/5 text-right font-mono text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-70"
           />
           <span className="w-6 text-xs text-muted-foreground">{unit}</span>
         </div>
@@ -53,6 +57,8 @@ export function NumberField({
         step={step}
         onValueChange={(vals) => onChange(Number.parseFloat((vals[0] ?? min).toFixed(decimals)))}
         aria-label={label}
+        disabled={disabled}
+        className={disabled ? "pointer-events-none opacity-70" : undefined}
       />
     </div>
   );
