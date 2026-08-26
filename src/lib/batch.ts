@@ -1,7 +1,9 @@
 import {
+  drawCode128ToPdf,
+  drawQrCodeToPdf,
   isContentValid,
-  renderCode128,
-  renderQrCode,
+  measureCode128,
+  measureQrCode,
   URL_REGEX,
   type CodeSettings,
   type CodeType,
@@ -58,14 +60,16 @@ export async function generatePdfBlob(content: string, type: CodeType): Promise<
   const settings: CodeSettings = { ...preset, content: content.trim() };
   if (!isContentValid(type, settings.content)) throw new Error(FORMAT_ERROR);
 
-  const canvas = document.createElement("canvas");
-  if (type === "code128") renderCode128(canvas, settings);
-  else await renderQrCode(canvas, settings);
-
   const { default: jsPDF } = await import("jspdf");
-  const heightMm = (canvas.height / canvas.width) * settings.totalWidth;
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  doc.addImage(canvas.toDataURL("image/png"), "PNG", 20, 25, settings.totalWidth, heightMm);
+  const measure = type === "code128" ? measureCode128(settings) : measureQrCode(settings);
+  const margin = 1;
+  const doc = new jsPDF({
+    unit: "mm",
+    orientation: "landscape",
+    format: [measure.width + margin * 2, measure.height + margin * 2],
+  });
+  if (type === "code128") drawCode128ToPdf(doc, margin, margin, settings);
+  else drawQrCodeToPdf(doc, margin, margin, settings);
   return doc.output("blob");
 }
 

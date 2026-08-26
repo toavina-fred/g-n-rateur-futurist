@@ -1,3 +1,4 @@
+import type { jsPDF } from "jspdf";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 
@@ -66,4 +67,105 @@ export async function renderQrCode(canvas: HTMLCanvasElement, s: CodeSettings) {
   // qrcode force des dimensions inline : on les rend au format millimétrique.
   canvas.style.width = `${s.totalWidth}mm`;
   canvas.style.height = "auto";
+}
+
+function buildCode128Svg(s: CodeSettings): { svg: SVGSVGElement; width: number; height: number } {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  JsBarcode(svg, s.content, {
+    format: "CODE128",
+    width: s.moduleWidth,
+    height: s.moduleHeight,
+    displayValue: false,
+    margin: 0,
+    lineColor: s.barColor,
+  });
+
+  const barsWidth = parseFloat(svg.getAttribute("width") ?? "0");
+  let totalHeight = s.moduleHeight;
+  if (s.showText) totalHeight += 1 + s.fontSize * PT_TO_MM;
+
+  return { svg, width: barsWidth, height: totalHeight };
+}
+
+/** Dimensions (mm) qu'occupera le Code 128 une fois rendu, sans dessiner. */
+export function measureCode128(s: CodeSettings): { width: number; height: number } {
+  const { width, height } = buildCode128Svg(s);
+  return { width, height };
+}
+
+/**
+ * Dessine le Code 128 directement en vecteur dans le PDF (au lieu d'une image
+ * raster) pour un rendu net à toute résolution d'impression/zoom.
+ */
+export function drawCode128ToPdf(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  s: CodeSettings,
+): { width: number; height: number } {
+  const { svg, width: barsWidth } = buildCode128Svg(s);
+
+  doc.setFillColor(s.barColor);
+  svg.querySelectorAll("g > rect").forEach((rect) => {
+    const rx = parseFloat(rect.getAttribute("x") ?? "0");
+    const ry = parseFloat(rect.getAttribute("y") ?? "0");
+    const rw = parseFloat(rect.getAttribute("width") ?? "0");
+    const rh = parseFloat(rect.getAttribute("height") ?? "0");
+    doc.rect(x + rx, y + ry, rw, rh, "F");
+  });
+
+  let totalHeight = s.moduleHeight;
+  if (s.showText) {
+    const textMargin = 1;
+    const textHeight = s.fontSize * PT_TO_MM;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(s.fontSize);
+    doc.setTextColor(s.barColor);
+    doc.text(s.content, x + barsWidth / 2, y + s.moduleHeight + textMargin + textHeight, {
+      align: "center",
+    });
+    totalHeight += textMargin + textHeight;
+  }
+
+  return { width: barsWidth, height: totalHeight };
+}
+
+function computeQrLayout(s: CodeSettings) {
+  const qr = QRCode.create(s.content.trim(), { errorCorrectionLevel: "M" });
+  const size = qr.modules.size;
+  const quietZone = 2;
+  const cell = s.moduleWidth;
+  return { qr, size, quietZone, cell, totalSize: (size + quietZone * 2) * cell };
+}
+
+/** Dimensions (mm) qu'occupera le QR code une fois rendu, sans dessiner. */
+export function measureQrCode(s: CodeSettings): { width: number; height: number } {
+  const { totalSize } = computeQrLayout(s);
+  return { width: totalSize, height: totalSize };
+}
+
+/**
+ * Dessine le QR code directement en vecteur (rectangles par module) dans le
+ * PDF, pour un rendu net à toute résolution d'impression/zoom.
+ */
+export function drawQrCodeToPdf(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  s: CodeSettings,
+): { width: number; height: number } {
+  const { qr, size, quietZone, cell, totalSize } = computeQrLayout(s);
+
+  doc.setFillColor(s.bgColor);
+  doc.rect(x, y, totalSize, totalSize, "F");
+  doc.setFillColor(s.barColor);
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      if (qr.modules.get(row, col)) {
+        doc.rect(x + (col + quietZone) * cell, y + (row + quietZone) * cell, cell, cell, "F");
+      }
+    }
+  }
+
+  return { width: totalSize, height: totalSize };
 }

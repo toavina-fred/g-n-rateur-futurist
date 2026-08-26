@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Barcode, Download, FileSpreadsheet, QrCode, ScanLine } from "lucide-react";
 
-
 import { ColorField } from "@/components/ColorField";
 import { NumberField } from "@/components/NumberField";
 import { Button } from "@/components/ui/button";
@@ -18,12 +17,17 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   contentError,
+  drawCode128ToPdf,
+  drawQrCodeToPdf,
   isContentValid,
+  measureCode128,
+  measureQrCode,
   renderCode128,
   renderQrCode,
   type CodeSettings,
   type CodeType,
 } from "@/lib/codegen";
+import { safeFileName } from "@/lib/batch";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,14 +49,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const FONTS = [
-  "Helvetica Neue",
-  "Arial",
-  "Courier New",
-  "Verdana",
-  "Roboto",
-  "Times New Roman",
-];
+const FONTS = ["Helvetica Neue", "Arial", "Courier New", "Verdana", "Roboto", "Times New Roman"];
 
 const DEFAULTS = {
   code128: { moduleWidth: 0.347, totalWidth: 35 },
@@ -133,13 +130,18 @@ function Index() {
   }, [draw]);
 
   const exportPdf = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !valid) return;
+    if (!valid) return;
     const { default: jsPDF } = await import("jspdf");
-    const heightMm = (canvas.height / canvas.width) * totalWidth;
-    const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    doc.addImage(canvas.toDataURL("image/png"), "PNG", 20, 25, totalWidth, heightMm);
-    doc.save(`${type === "code128" ? "code128" : "qrcode"}-${Date.now()}.pdf`);
+    const measure = type === "code128" ? measureCode128(settings) : measureQrCode(settings);
+    const margin = 1;
+    const doc = new jsPDF({
+      unit: "mm",
+      orientation: "landscape",
+      format: [measure.width + margin * 2, measure.height + margin * 2],
+    });
+    if (type === "code128") drawCode128ToPdf(doc, margin, margin, settings);
+    else drawQrCodeToPdf(doc, margin, margin, settings);
+    doc.save(`${safeFileName(content)}.pdf`);
   };
 
   const isBarcode = type === "code128";
@@ -166,8 +168,8 @@ function Index() {
           </span>
         </h1>
         <p className="max-w-xl text-base text-muted-foreground">
-          Réglez chaque dimension au millimètre près, prévisualisez en temps réel et exportez
-          votre code en PDF, sans aucun envoi de données.
+          Réglez chaque dimension au millimètre près, prévisualisez en temps réel et exportez votre
+          code en PDF, sans aucun envoi de données.
         </p>
       </header>
 
@@ -341,7 +343,7 @@ function Index() {
               {valid ? (
                 <canvas
                   ref={canvasRef}
-                  className="h-auto max-w-full animate-fade-in rounded-sm shadow-lg"
+                  className="h-auto max-w-full animate-fade-in shadow-lg"
                   style={{ width: `${totalWidth}mm` }}
                 />
               ) : (
