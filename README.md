@@ -12,7 +12,7 @@ Une page dédiée permet aussi la **génération en masse** à partir d'un impor
 - [JsBarcode](https://github.com/lindell/JsBarcode) (Code 128) et [qrcode](https://github.com/soldair/node-qrcode) (QR Code)
 - [jsPDF](https://github.com/parallax/jsPDF) pour l'export PDF vectoriel
 - [xlsx](https://github.com/SheetJS/sheetjs) + [JSZip](https://stuk.github.io/jszip/) pour l'import Excel et l'export ZIP
-- [Nitro](https://nitro.build) pour le build serveur (déploiement par défaut sur Cloudflare Workers)
+- [Nitro](https://nitro.build) pour le build serveur (préset `node-server`, serveur Node autonome)
 
 ## Prérequis
 
@@ -54,39 +54,60 @@ Le build de production est généré par Nitro dans le dossier `.output/` :
 bun run build
 ```
 
-### Option 1 — Cloudflare Workers (déploiement par défaut)
-
-Le projet est préconfiguré pour Cloudflare Workers (`preset: cloudflare-module`). Après le build :
+Le build cible le préset Nitro `node-server` (configuré dans `vite.config.ts`), qui produit un serveur Node autonome dans `.output/server/index.mjs` (avec son propre `node_modules`, pas besoin de réinstaller de dépendances sur le serveur cible).
 
 ```sh
-npx wrangler deploy
-# ou, équivalent :
-npx nitro deploy --prebuilt
-```
-
-Cela nécessite un compte Cloudflare et d'être authentifié via `npx wrangler login` au préalable.
-
-Pour prévisualiser ce build localement avant de déployer (le classique `vite preview` ne fonctionne pas ici car la sortie est un worker SSR, pas un site statique) :
-
-```sh
-npx wrangler dev
-```
-
-### Option 2 — Serveur Node.js classique (VPS, conteneur, etc.)
-
-Pour déployer sur un serveur Node.js standard plutôt que sur Cloudflare, forcez le préset Nitro `node-server` au moment du build :
-
-```sh
-NITRO_PRESET=node-server bun run build
-```
-
-Puis, sur le serveur cible :
-
-```sh
-# Copier le contenu de .output/ sur le serveur, installer les dépendances de production si besoin, puis :
+# Copier le contenu de .output/ sur le serveur, puis :
 node .output/server/index.mjs
 ```
 
-Par défaut, le serveur écoute sur le port défini par la variable d'environnement `PORT` (3000 si non définie). Un reverse proxy (Nginx, Caddy…) peut ensuite exposer l'application en HTTPS sur un nom de domaine.
+Par défaut, le serveur écoute sur le port défini par la variable d'environnement `PORT` (3000 si non définie). Un reverse proxy (Nginx, Caddy, IIS…) peut ensuite exposer l'application en HTTPS sur un nom de domaine.
 
-> D'autres présets Nitro sont disponibles (Vercel, Netlify, Deno Deploy, etc.) — voir la [documentation Nitro](https://nitro.build/deploy) pour la liste complète et la variable `NITRO_PRESET` correspondante.
+> D'autres présets Nitro sont disponibles (Cloudflare Workers, Vercel, Netlify, Deno Deploy, etc.) — voir la [documentation Nitro](https://nitro.build/deploy) pour la liste complète.
+
+### Déployer sur un serveur Windows avec PM2
+
+**1. Prérequis** (une fois)
+
+```powershell
+# Node.js LTS depuis nodejs.org
+# Bun
+powershell -c "irm bun.sh/install.ps1 | iex"
+npm install -g pm2
+```
+
+**2. Récupérer et builder**
+
+```powershell
+git clone <url-du-depot> C:\apps\code-generator
+cd C:\apps\code-generator
+bun install
+bun run build
+```
+
+**3. Lancer avec PM2**
+
+Le fichier `ecosystem.config.js` à la racine du projet configure l'app PM2 `code-generator` (port 3000) :
+
+```powershell
+pm2 start ecosystem.config.js
+pm2 save
+```
+
+**4. Démarrage automatique au boot** (une fois)
+
+```powershell
+npm install -g pm2-windows-startup
+pm2-startup install
+pm2 save
+```
+
+**Commandes usuelles**
+
+```powershell
+pm2 status
+pm2 logs code-generator
+pm2 restart code-generator   # après un nouveau bun run build
+```
+
+Mettre un reverse proxy (IIS + ARR, ou nginx pour Windows) devant pour le HTTPS/domaine.
