@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Build a standalone Node server (for PM2 on Windows) instead of the Cloudflare Worker default.
+  nitro: {
+    preset: "node-server",
+  },
 });
