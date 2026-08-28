@@ -276,6 +276,9 @@ function computeQrLayout(s: CodeSettings) {
   const qr = QRCode.create(s.content.trim(), { errorCorrectionLevel: "M" });
   const size = qr.modules.size;
   const quietZone = 2;
+  // `totalWidth` correspond au carré entier affiché (modules + marge de
+  // silence), pour que la valeur réglée corresponde à la taille réellement
+  // visible à l'écran comme à l'impression.
   const cell = s.totalWidth / (size + quietZone * 2);
   return { qr, size, quietZone, cell, totalSize: (size + quietZone * 2) * cell };
 }

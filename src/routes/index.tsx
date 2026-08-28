@@ -28,17 +28,18 @@ import {
   type CodeType,
 } from "@/lib/codegen";
 import { safeFileName } from "@/lib/batch";
+import { getFormSnapshot, setFormSnapshot } from "@/lib/formStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Codeflux — Générateur de Code 128 et QR Codes" },
+      { title: "CodeGenerator — Générateur de Code 128 et QR Codes" },
       {
         name: "description",
         content:
           "Générez et exportez en PDF des codes-barres Code 128 et des QR Codes, avec réglages précis en millimètres, couleurs et aperçu en temps réel.",
       },
-      { property: "og:title", content: "Codeflux — Générateur de Code 128 et QR Codes" },
+      { property: "og:title", content: "CodeGenerator — Générateur de Code 128 et QR Codes" },
       {
         property: "og:description",
         content:
@@ -59,17 +60,25 @@ const DEFAULTS = {
 const TOTAL_WIDTH_MAX = 100;
 
 function Index() {
-  const [type, setType] = useState<CodeType>("code128");
-  const [content, setContent] = useState("");
-  const [totalWidth, setTotalWidth] = useState(DEFAULTS.code128.totalWidth);
-  const [moduleHeight, setModuleHeight] = useState(4);
-  const [barColor, setBarColor] = useState("#000000");
-  const [bgColor, setBgColor] = useState("#FFFFFF");
-  const [showText, setShowText] = useState(true);
-  const [fontFamily, setFontFamily] = useState("Helvetica Neue");
-  const [fontSize, setFontSize] = useState(7);
-  const [letterSpacing, setLetterSpacing] = useState(1.37);
+  const initial = getFormSnapshot();
+  const [type, setType] = useState<CodeType>(initial?.type ?? "code128");
+  const [content, setContent] = useState(initial?.content ?? "");
+  const [totalWidth, setTotalWidth] = useState(initial?.totalWidth ?? DEFAULTS.code128.totalWidth);
+  const [moduleHeight, setModuleHeight] = useState(initial?.moduleHeight ?? 4);
+  const [barColor, setBarColor] = useState(initial?.barColor ?? "#000000");
+  const [bgColor, setBgColor] = useState(initial?.bgColor ?? "#FFFFFF");
+  const [showText, setShowText] = useState(initial?.showText ?? true);
+  const [fontFamily, setFontFamily] = useState(initial?.fontFamily ?? "Helvetica Neue");
+  const [fontSize, setFontSize] = useState(initial?.fontSize ?? 7);
+  const [letterSpacing, setLetterSpacing] = useState(initial?.letterSpacing ?? 1.37);
   const [touched, setTouched] = useState(false);
+
+  const totalWidthByTypeRef = useRef<Record<CodeType, number>>(
+    initial?.totalWidthByType ?? {
+      code128: DEFAULTS.code128.totalWidth,
+      qrcode: DEFAULTS.qrcode.totalWidth,
+    },
+  );
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -117,15 +126,10 @@ function Index() {
 
   const handleTypeChange = (next: string) => {
     const nextType = next as CodeType;
+    totalWidthByTypeRef.current[type] = totalWidth;
     setType(nextType);
-    setTotalWidth(DEFAULTS[nextType].totalWidth);
-    setModuleHeight(4);
-    setBarColor("#000000");
-    setBgColor("#FFFFFF");
-    setShowText(true);
-    setFontFamily("Helvetica Neue");
-    setFontSize(7);
-    setLetterSpacing(1.37);
+    setTotalWidth(totalWidthByTypeRef.current[nextType] ?? DEFAULTS[nextType].totalWidth);
+    setContent("");
     setTouched(false);
   };
 
@@ -133,6 +137,15 @@ function Index() {
     setContent(type === "code128" ? value.slice(0, 50) : value);
     setTouched(true);
   };
+
+  const previewWidth = useMemo(() => {
+    if (!valid) return totalWidth;
+    try {
+      return type === "code128" ? measureCode128(settings).width : measureQrCode(settings).width;
+    } catch {
+      return totalWidth;
+    }
+  }, [valid, type, settings, totalWidth]);
 
   const draw = useCallback(async () => {
     const canvas = canvasRef.current;
@@ -148,6 +161,14 @@ function Index() {
   useEffect(() => {
     void draw();
   }, [draw]);
+
+  useEffect(() => {
+    totalWidthByTypeRef.current[type] = totalWidth;
+    setFormSnapshot({
+      ...settings,
+      totalWidthByType: { ...totalWidthByTypeRef.current },
+    });
+  }, [settings, type, totalWidth]);
 
   const exportPdf = async () => {
     if (!valid) return;
@@ -367,7 +388,7 @@ function Index() {
                 <canvas
                   ref={canvasRef}
                   className="h-auto animate-fade-in shadow-lg"
-                  style={{ width: `clamp(220px, ${totalWidth}mm, 100%)` }}
+                  style={{ width: `${previewWidth}mm`, flexShrink: 0 }}
                 />
               ) : (
                 <div className="flex flex-col items-center gap-3 py-8 text-center text-muted-foreground">

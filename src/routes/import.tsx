@@ -24,17 +24,18 @@ import {
   type ParsedRow,
 } from "@/lib/batch";
 import type { CodeType } from "@/lib/codegen";
+import { getFormSnapshot } from "@/lib/formStore";
 
 export const Route = createFileRoute("/import")({
   head: () => ({
     meta: [
-      { title: "Génération en masse par import Excel — Codeflux" },
+      { title: "Génération en masse par import Excel — CodeGenerator" },
       {
         name: "description",
         content:
           "Importez un fichier Excel contenant une colonne « Contenu » et générez automatiquement vos Code 128 et QR Codes en PDF, regroupés dans une archive ZIP.",
       },
-      { property: "og:title", content: "Génération en masse par import Excel — Codeflux" },
+      { property: "og:title", content: "Génération en masse par import Excel — CodeGenerator" },
       {
         property: "og:description",
         content:
@@ -141,7 +142,21 @@ function ImportPage() {
         );
       } else {
         try {
-          const blob = await generatePdfBlob(row.content, row.type);
+          const snapshot = getFormSnapshot();
+          const blob = await generatePdfBlob(
+            row.content,
+            row.type,
+            snapshot && {
+              barColor: snapshot.barColor,
+              bgColor: snapshot.bgColor,
+              showText: snapshot.showText,
+              fontFamily: snapshot.fontFamily,
+              fontSize: snapshot.fontSize,
+              letterSpacing: snapshot.letterSpacing,
+              moduleHeight: snapshot.moduleHeight,
+              totalWidth: snapshot.totalWidthByType[row.type],
+            },
+          );
           const name = `${safeFileName(row.content)}.pdf`;
           blobsRef.current.push({ name, blob });
           const url = URL.createObjectURL(blob);
@@ -352,7 +367,7 @@ function ImportPage() {
           {zipUrl && (
             <a
               href={zipUrl}
-              download={`codeflux-codes-${Date.now()}.zip`}
+              download={`code_generator_${Date.now()}.zip`}
               className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-gradient-to-r from-primary to-accent px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:opacity-95 hover:glow-neon"
             >
               <Download className="mr-2 h-4 w-4" />

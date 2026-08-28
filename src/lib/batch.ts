@@ -56,10 +56,37 @@ export function safeFileName(raw: string): string {
   return base.length > 0 ? base : "code";
 }
 
+/** Réglages de style transmis depuis le formulaire manuel vers l'import par lot. */
+export type StyleOverrides = Partial<
+  Pick<
+    CodeSettings,
+    | "barColor"
+    | "bgColor"
+    | "showText"
+    | "fontFamily"
+    | "fontSize"
+    | "letterSpacing"
+    | "moduleHeight"
+    | "totalWidth"
+  >
+>;
+
 /** Génère un PDF (Blob) pour un contenu et un type détecté. */
-export async function generatePdfBlob(content: string, type: CodeType): Promise<Blob> {
+export async function generatePdfBlob(
+  content: string,
+  type: CodeType,
+  styleOverrides?: StyleOverrides,
+): Promise<Blob> {
   const preset = type === "code128" ? CODE128_PRESET : QRCODE_PRESET;
-  const settings: CodeSettings = { ...preset, content: content.trim() };
+  const totalWidth = styleOverrides?.totalWidth ?? preset.totalWidth;
+  const moduleWidth = (preset.moduleWidth / preset.totalWidth) * totalWidth;
+  const settings: CodeSettings = {
+    ...preset,
+    ...styleOverrides,
+    moduleWidth,
+    totalWidth,
+    content: content.trim(),
+  };
   if (!isContentValid(type, settings.content)) throw new Error(FORMAT_ERROR);
 
   const { default: jsPDF } = await import("jspdf");

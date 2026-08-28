@@ -1,175 +1,92 @@
-# Générateur Futurist
+# CodeGenerator — Générateur de Code 128 & QR Codes
 
-Bonjour,
-Crée un site web vitrine one-page au design futuriste, épuré et harmonieux, servant d'outil de génération de codes-barres (Code 128) et de QR Codes.
+Application web (one-page, thème sombre/glassmorphism) permettant de générer des codes-barres **Code 128** et des **QR Codes**, de les prévisualiser en temps réel avec des réglages précis (dimensions en mm, couleurs, police), et de les exporter en **PDF vectoriel**. Tout se passe côté client : aucune donnée n'est envoyée à un serveur.
 
-Stack technique
+Une page dédiée permet aussi la **génération en masse** à partir d'un import Excel (colonne « Contenu »), avec export groupé au format ZIP.
 
-React (Vite) + TypeScript
+## Stack technique
 
-Tailwind CSS pour le style
+- [React 19](https://react.dev) + [TypeScript](https://www.typescriptlang.org)
+- [TanStack Start](https://tanstack.com/start) (routing + SSR) sur [Vite](https://vite.dev)
+- [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) pour les composants
+- [JsBarcode](https://github.com/lindell/JsBarcode) (Code 128) et [qrcode](https://github.com/soldair/node-qrcode) (QR Code)
+- [jsPDF](https://github.com/parallax/jsPDF) pour l'export PDF vectoriel
+- [xlsx](https://github.com/SheetJS/sheetjs) + [JSZip](https://stuk.github.io/jszip/) pour l'import Excel et l'export ZIP
+- [Nitro](https://nitro.build) pour le build serveur (déploiement par défaut sur Cloudflare Workers)
 
-shadcn/ui pour les composants de formulaire (Select, Input, Slider, ColorPicker, RadioGroup)
+## Prérequis
 
-Utiliser une librairie de génération côté client :
+- [Bun](https://bun.sh) (gestionnaire de paquets du projet, cf. `bun.lock`) — ou Node.js 20+ avec npm en repli.
 
-JsBarcode pour le Code 128
-
-qrcode (ou qrcode.react) pour le QR Code
-
-jsPDF (+ html2canvas si besoin) pour l'export PDF de l'aperçu généré
-
-Direction artistique
-
-Thème sombre par défaut (fond dégradé bleu nuit / violet profond), avec effet glassmorphism (cartes translucides, bordures fines lumineuses, léger flou d'arrière-plan)
-
-Accents néon (cyan / violet électrique) sur les boutons, focus des champs et bordures actives
-
-Typographie moderne et lisible (ex. Space Grotesk ou Inter) pour l'UI générale
-
-Animations douces : transitions au survol, apparition en fondu des champs conditionnels, légère lueur (glow) sur le bouton d'export
-
-Layout en deux colonnes sur desktop : formulaire à gauche, prévisualisation en temps réel à droite (sticky), qui se replient en une seule colonne empilée sur mobile
-
-Interface entièrement en français
-
-Formulaire — champs et logique métier
-
-1. Type de code-barres
-
-Champ Select nommé "Type de code-barres"
-
-Deux valeurs uniquement : Code 128 / QR Code
-
-C'est ce choix qui détermine l'affichage et les règles des autres champs (voir ci-dessous)
-
-2. Contenu
-
-Champ texte "Contenu"
-
-Si Code 128 sélectionné :
-
-Saisie strictement limitée à 9 caractères, ni plus ni moins
-
-Validation en temps réel : bloquer la saisie au-delà de 9 caractères, afficher un message d'erreur si moins de 9 caractères au moment de générer
-
-Compteur de caractères visible (ex. "6/9")
-
-Si QR Code sélectionné :
-
-Le champ doit contenir uniquement une URL valide (regex de validation d'URL, ex. commence par http:// ou https://)
-
-Message d'erreur clair si le format n'est pas une URL valide
-
-3. Largeur du module
-
-Champ numérique avec réglage (input number ou slider + input)
-
-Valeur par défaut : 0,347 mm si Code 128, 0,952 mm si QR Code
-
-Se met à jour automatiquement à la valeur par défaut lors du changement de type (mais reste modifiable par l'utilisateur)
-
-4. Largeur code-barres
-
-Champ numérique avec réglage
-
-Valeur par défaut : 35,000 mm si Code 128, 20,000 mm si QR Code
-
-5. Hauteur du module
-
-Champ numérique avec réglage
-
-Valeur par défaut : 4,000 mm
-
-Visible uniquement si Code 128 est sélectionné (champ masqué si QR Code)
-
-6. Couleur des barres
-
-Sélecteur de couleur (color picker)
-
-Valeur par défaut : noir (#000000)
-
-Modifiable librement par l'utilisateur
-
-7. Couleur du fond
-
-Sélecteur de couleur (color picker)
-
-Valeur par défaut : blanc (#FFFFFF)
-
-Modifiable librement par l'utilisateur
-
-8. Afficher la ligne de texte (radio / switch)
-
-Bouton radio ou switch "Afficher la ligne de texte"
-
-Si activé : afficher le contenu du champ 2 sous le code-barres généré
-
-Visible uniquement si Code 128 est sélectionné (masqué si QR Code, car non pertinent)
-
-9. Police
-
-Champ Select listant plusieurs polices (ex. Helvetica Neue, Arial, Courier New, Verdana, Roboto…)
-
-Valeur par défaut : Helvetica Neue
-
-Visible uniquement si Code 128 est sélectionné
-
-10. Taille de police
-
-Champ numérique avec réglage
-
-Valeur par défaut : 7,00 pt
-
-Visible uniquement si Code 128 est sélectionné
-
-11. Prévisualisation
-
-Zone de prévisualisation en temps réel, dans une carte glassmorphism bien mise en valeur
-
-Si Code 128 : afficher l'image du code-barres généré dynamiquement selon tous les réglages (largeur module, largeur totale, hauteur module, couleurs, police, taille police, ligne de texte)
-
-Si QR Code : afficher l'image du QR Code généré dynamiquement selon le contenu, la largeur du module, la largeur totale et les couleurs
-
-Mise à jour instantanée à chaque modification d'un champ (pas besoin de bouton "générer")
-
-Afficher un état vide élégant tant que le contenu n'est pas valide (placeholder avec icône)
-
-12. Export PDF
-
-Bouton "Exporter en PDF" avec effet néon au survol
-
-Génère un PDF contenant l'image du code-barres/QR code généré (aux dimensions définies), téléchargeable directement
-
-Désactivé (grisé) tant que le contenu n'est pas valide
-
-Comportement général attendu
-
-Validation en temps réel avec messages d'erreur clairs et discrets (rouge doux, pas agressif)
-
-Changement fluide (fade/slide) entre les champs affichés/masqués lors du switch Code 128 ↔ QR Code
-
-Design responsive, optimisé desktop et mobile
-
-Aucune donnée n'a besoin d'être sauvegardée en base : tout se passe côté client
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/3ca55307-4479-4444-b851-13be33ec593c).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Lancer le projet en local
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+# 1. Cloner le dépôt
+git clone <url-du-depot>
+cd generateur-futurist
+
+# 2. Installer les dépendances
+bun install
+# (ou : npm install)
+
+# 3. Lancer le serveur de développement
+bun run dev
+# (ou : npm run dev)
 ```
+
+Le terminal affiche l'URL locale (généralement `http://localhost:5173`, potentiellement un autre port selon l'environnement). Le rechargement à chaud est activé : les modifications de code sont reflétées immédiatement dans le navigateur.
+
+### Autres commandes utiles
+
+| Commande            | Description                                              |
+| ------------------- | --------------------------------------------------------- |
+| `bun run build`      | Build de production (sortie dans `.output/`)               |
+| `bun run lint`       | Vérifie le code avec ESLint                                 |
+| `bun run format`     | Formate le code avec Prettier                               |
+
+(Remplacer `bun run` par `npm run` selon le gestionnaire choisi.)
+
+## Déployer sur un serveur
+
+Le build de production est généré par Nitro dans le dossier `.output/` :
+
+```sh
+bun run build
+```
+
+### Option 1 — Cloudflare Workers (déploiement par défaut)
+
+Le projet est préconfiguré pour Cloudflare Workers (`preset: cloudflare-module`). Après le build :
+
+```sh
+npx wrangler deploy
+# ou, équivalent :
+npx nitro deploy --prebuilt
+```
+
+Cela nécessite un compte Cloudflare et d'être authentifié via `npx wrangler login` au préalable.
+
+Pour prévisualiser ce build localement avant de déployer (le classique `vite preview` ne fonctionne pas ici car la sortie est un worker SSR, pas un site statique) :
+
+```sh
+npx wrangler dev
+```
+
+### Option 2 — Serveur Node.js classique (VPS, conteneur, etc.)
+
+Pour déployer sur un serveur Node.js standard plutôt que sur Cloudflare, forcez le préset Nitro `node-server` au moment du build :
+
+```sh
+NITRO_PRESET=node-server bun run build
+```
+
+Puis, sur le serveur cible :
+
+```sh
+# Copier le contenu de .output/ sur le serveur, installer les dépendances de production si besoin, puis :
+node .output/server/index.mjs
+```
+
+Par défaut, le serveur écoute sur le port défini par la variable d'environnement `PORT` (3000 si non définie). Un reverse proxy (Nginx, Caddy…) peut ensuite exposer l'application en HTTPS sur un nom de domaine.
+
+> D'autres présets Nitro sont disponibles (Vercel, Netlify, Deno Deploy, etc.) — voir la [documentation Nitro](https://nitro.build/deploy) pour la liste complète et la variable `NITRO_PRESET` correspondante.
