@@ -28,7 +28,6 @@ import {
   type CodeType,
 } from "@/lib/codegen";
 import { safeFileName } from "@/lib/batch";
-import { loadSettings, saveSettings } from "@/lib/settingsStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -60,19 +59,16 @@ const DEFAULTS = {
 const TOTAL_WIDTH_MAX = 100;
 
 function Index() {
-  const initialSettings = loadSettings("code128");
   const [type, setType] = useState<CodeType>("code128");
   const [content, setContent] = useState("");
-  const [totalWidth, setTotalWidth] = useState(
-    initialSettings?.totalWidth ?? DEFAULTS.code128.totalWidth,
-  );
-  const [moduleHeight, setModuleHeight] = useState(initialSettings?.moduleHeight ?? 4);
-  const [barColor, setBarColor] = useState(initialSettings?.barColor ?? "#000000");
-  const [bgColor, setBgColor] = useState(initialSettings?.bgColor ?? "#FFFFFF");
-  const [showText, setShowText] = useState(initialSettings?.showText ?? true);
-  const [fontFamily, setFontFamily] = useState(initialSettings?.fontFamily ?? "Helvetica Neue");
-  const [fontSize, setFontSize] = useState(initialSettings?.fontSize ?? 7);
-  const [letterSpacing, setLetterSpacing] = useState(initialSettings?.letterSpacing ?? 1.37);
+  const [totalWidth, setTotalWidth] = useState(DEFAULTS.code128.totalWidth);
+  const [moduleHeight, setModuleHeight] = useState(4);
+  const [barColor, setBarColor] = useState("#000000");
+  const [bgColor, setBgColor] = useState("#FFFFFF");
+  const [showText, setShowText] = useState(true);
+  const [fontFamily, setFontFamily] = useState("Helvetica Neue");
+  const [fontSize, setFontSize] = useState(7);
+  const [letterSpacing, setLetterSpacing] = useState(1.37);
   const [touched, setTouched] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -121,21 +117,20 @@ function Index() {
 
   const handleTypeChange = (next: string) => {
     const nextType = next as CodeType;
-    const stored = loadSettings(nextType);
     setType(nextType);
-    setTotalWidth(stored?.totalWidth ?? DEFAULTS[nextType].totalWidth);
-    setModuleHeight(stored?.moduleHeight ?? 4);
-    setBarColor(stored?.barColor ?? "#000000");
-    setBgColor(stored?.bgColor ?? "#FFFFFF");
-    setShowText(stored?.showText ?? true);
-    setFontFamily(stored?.fontFamily ?? "Helvetica Neue");
-    setFontSize(stored?.fontSize ?? 7);
-    setLetterSpacing(stored?.letterSpacing ?? 1.37);
+    setTotalWidth(DEFAULTS[nextType].totalWidth);
+    setModuleHeight(4);
+    setBarColor("#000000");
+    setBgColor("#FFFFFF");
+    setShowText(true);
+    setFontFamily("Helvetica Neue");
+    setFontSize(7);
+    setLetterSpacing(1.37);
     setTouched(false);
   };
 
   const handleContentChange = (value: string) => {
-    setContent(type === "code128" ? value.slice(0, 11) : value);
+    setContent(type === "code128" ? value.slice(0, 50) : value);
     setTouched(true);
   };
 
@@ -153,10 +148,6 @@ function Index() {
   useEffect(() => {
     void draw();
   }, [draw]);
-
-  useEffect(() => {
-    saveSettings(type, settings);
-  }, [type, settings]);
 
   const exportPdf = async () => {
     if (!valid) return;
@@ -375,8 +366,8 @@ function Index() {
               {valid ? (
                 <canvas
                   ref={canvasRef}
-                  className="h-auto max-w-full animate-fade-in shadow-lg"
-                  style={{ width: `${totalWidth}mm` }}
+                  className="h-auto animate-fade-in shadow-lg"
+                  style={{ width: `clamp(220px, ${totalWidth}mm, 100%)` }}
                 />
               ) : (
                 <div className="flex flex-col items-center gap-3 py-8 text-center text-muted-foreground">

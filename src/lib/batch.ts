@@ -8,7 +8,6 @@ import {
   type CodeSettings,
   type CodeType,
 } from "./codegen";
-import { loadSettings } from "./settingsStore";
 
 export const CODE128_PRESET: Omit<CodeSettings, "content"> = {
   type: "code128",
@@ -60,8 +59,7 @@ export function safeFileName(raw: string): string {
 /** Génère un PDF (Blob) pour un contenu et un type détecté. */
 export async function generatePdfBlob(content: string, type: CodeType): Promise<Blob> {
   const preset = type === "code128" ? CODE128_PRESET : QRCODE_PRESET;
-  const stored = loadSettings(type);
-  const settings: CodeSettings = { ...preset, ...stored, content: content.trim() };
+  const settings: CodeSettings = { ...preset, content: content.trim() };
   if (!isContentValid(type, settings.content)) throw new Error(FORMAT_ERROR);
 
   const { default: jsPDF } = await import("jspdf");

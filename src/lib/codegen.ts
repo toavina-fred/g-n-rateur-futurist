@@ -15,7 +15,7 @@ export const PT_TO_MM = 0.352_777_8;
 const CODE128_MARGIN_SIDE_MM = 3.5;
 const CODE128_MARGIN_TOP_MM = 1.69;
 const CODE128_TEXT_GAP_MM = 0.17;
-const CODE128_MARGIN_BOTTOM_MM = 0.51;
+const CODE128_MARGIN_BOTTOM_MM = 1.69;
 
 export type CodeType = "code128" | "qrcode";
 
@@ -136,6 +136,7 @@ export function renderCode128(canvas: HTMLCanvasElement, s: CodeSettings) {
     height: Math.max(1, s.moduleHeight * PX_PER_MM),
     displayValue: false,
     lineColor: s.barColor,
+    background: s.bgColor,
     margin: 0,
   });
 
@@ -179,14 +180,18 @@ export async function renderQrCode(canvas: HTMLCanvasElement, s: CodeSettings) {
     scale: Math.max(1, Math.round(cell * PX_PER_MM)),
     color: { dark: s.barColor, light: s.bgColor },
   });
-  // qrcode force des dimensions inline : on les rend au format millimétrique.
-  canvas.style.width = `${s.totalWidth}mm`;
+  // qrcode force des dimensions inline en px : on laisse le CSS du composant
+  // (largeur responsive) reprendre la main plutôt que de les figer ici.
+  canvas.style.removeProperty("width");
   canvas.style.height = "auto";
 }
 
-function buildCode128Svg(
-  s: CodeSettings,
-): { svg: SVGSVGElement; barsWidth: number; width: number; height: number } {
+function buildCode128Svg(s: CodeSettings): {
+  svg: SVGSVGElement;
+  barsWidth: number;
+  width: number;
+  height: number;
+} {
   const moduleWidthMm = computeCode128ModuleWidthMm(s);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   JsBarcode(svg, s.content, {
@@ -196,6 +201,7 @@ function buildCode128Svg(
     displayValue: false,
     margin: 0,
     lineColor: s.barColor,
+    background: s.bgColor,
   });
 
   const barsWidth = parseFloat(svg.getAttribute("width") ?? "0");
@@ -223,9 +229,12 @@ export function drawCode128ToPdf(
   y: number,
   s: CodeSettings,
 ): { width: number; height: number } {
-  const { svg, barsWidth, width: totalWidth } = buildCode128Svg(s);
+  const { svg, barsWidth, width: totalWidth, height: totalHeightMeasured } = buildCode128Svg(s);
   const barsX = x + CODE128_MARGIN_SIDE_MM;
   const barsY = y + CODE128_MARGIN_TOP_MM;
+
+  doc.setFillColor(s.bgColor);
+  doc.rect(x, y, totalWidth, totalHeightMeasured, "F");
 
   doc.setFillColor(s.barColor);
   svg.querySelectorAll("g > rect").forEach((rect) => {
